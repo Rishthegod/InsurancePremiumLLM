@@ -43,17 +43,28 @@ def scrapeBusinessType(url, session):
     # Extract business type description
     description_div = soup.find('div', class_='field-phraseology-wrapper')
     description = description_div.get_text(strip=True) if description_div else "N/A"
+    description = description[11:] if description_div else "N/A" # Remove "Phraseology: " prefix
     
     # Extract latest pure premium rate
     rate_div = soup.find('div', class_='field field--name-field-classification-code field--type-entity-reference field--label-hidden field__item')
     rate = rate_div.get_text(strip=True) if rate_div else "N/A"
+    rate = rate[24:]  # Remove "Latest Pure Premium Rate: " prefix
+
+    # Extract classification code
+    classification_code_div = soup.find('div', class_='classification-code-wrapper field-wrapper')
+    classification_code = classification_code_div.find('p').get_text(strip=True) if classification_code_div else "N/A"
+    
+    # Extract pure premium rate effective date
+    effective_date_div = soup.find('div', class_='field-date-wrapper field-wrapper')
+    effective_date = effective_date_div.find('time').get_text(strip=True) if effective_date_div else "N/A"
     
     # Extract footnotes and keywords
     footnotes = soup.find_all('div', class_='footnote-wrapper')
     footnotes_text = ' '.join([footnote.get_text(strip=True) for footnote in footnotes])
+    footnotes_text = footnotes_text[8:]  # Remove "Footnotes: " prefix
     keywords = extractKeywords(description + " " + footnotes_text)
     
-    return description, rate, footnotes_text, keywords
+    return description, rate, classification_code, effective_date, footnotes_text, keywords
 
 # Function to scrape the base URL
 def scrape_base_url(base_url, output_file):
@@ -100,10 +111,12 @@ def scrape_base_url(base_url, output_file):
                 try:
                     """Scrape each business type page for the Phreaseology, Latest Pure Premium Rate, Footnote, and keywords."""
 
-                    description, rate, footnotes_text, keywords = scrapeBusinessType(link, session)
+                    description, rate, classification_code, effective_date, footnotes_text, keywords = scrapeBusinessType(link, session)
                     data.append({
                         'Phraseology': description,
                         'Latest Pure Premium Rate': rate,
+                        'Classification Code': classification_code,
+                        'Pure Premium Rate Effective Date': effective_date,
                         'Footnote': footnotes_text,
                         'Keywords': keywords
                     })
@@ -140,37 +153,7 @@ def SaveToCSV(data, output_file):
     df = df.replace("N/A", "")  # Replace "N/A" with empty strings
     df.to_csv(output_file, mode='a', header=not pd.io.common.file_exists(output_file), index=False)
 
-# Base URL and output file
-base_url = "https://www.wcirb.com/products-and-services/classification-search"
-output_file = 'business_types_data.csv'
-
-# Scrape the data
-scrape_base_url(base_url, output_file)
-
-print("Data scraped and saved to business_types_data.csv")
 
 
 
 
-
-"""
-    # Future Possible Implementation using nltk tokenizing to have better keywords:
-    #currently running this code gives worse keyword selection than the TF-IDF vectorization (in my opinion)
-
-    import nltk
-    from nltk.corpus import stopwords
-    from nltk.tokenize import word_tokenize
-    from nltk.tag import pos_tag
-    import string
-
-    # Download nltk data
-    nltk.download('punkt')
-    nltk.download('averaged_perceptron_tagger')
-    nltk.download('stopwords')
-
-    if text.strip() == "":
-        return "N/A"
-    words = word_tokenize(text)
-    tagged_words = pos_tag(words)
-    keywords = [word for word, pos in tagged_words if pos in ('NN', 'NNS', 'NNP', 'NNPS') and word.lower() not in stopwords.words('english') and word not in string.punctuation]
-    return ', '.join(keywords[:10])  # Limit to top 10 keywords"""
