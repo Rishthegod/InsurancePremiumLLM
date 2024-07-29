@@ -7,7 +7,6 @@ from urllib3.util.retry import Retry
 import time
 
 
-
 # Function to extract keywords from text, focusing on nouns and proper nouns
 def extractKeywords(text):
     """ 
@@ -24,7 +23,6 @@ def extractKeywords(text):
     X = vectorizer.fit_transform([text])
     keywords = vectorizer.get_feature_names_out()
     return ', '.join(keywords)
-   
 
 # Function to scrape individual business type page
 def scrapeBusinessType(url, session):
@@ -61,10 +59,10 @@ def scrapeBusinessType(url, session):
     # Extract footnotes and keywords
     footnotes = soup.find_all('div', class_='footnote-wrapper')
     footnotes_text = ' '.join([footnote.get_text(strip=True) for footnote in footnotes])
-    footnotes_text = footnotes_text[8:]  # Remove "Footnotes: " prefix
+    footnotes_text = footnotes_text[8:] if footnotes_text else "N/A" # Remove "Footnotes: " prefix
     keywords = extractKeywords(description + " " + footnotes_text)
     
-    return description, rate, classification_code, effective_date, footnotes_text, keywords
+    return description, rate, classification_code, effective_date, footnotes_text , keywords
 
 # Function to scrape the base URL
 def scrape_base_url(base_url, output_file):
@@ -109,7 +107,7 @@ def scrape_base_url(base_url, output_file):
             
             for link in business_type_links:
                 try:
-                    """Scrape each business type page for the Phreaseology, Latest Pure Premium Rate, Footnote, and keywords."""
+                    """Scrape each business type page for the Phreaseology, Latest Pure Premium Rate, Footnote, """
 
                     description, rate, classification_code, effective_date, footnotes_text, keywords = scrapeBusinessType(link, session)
                     data.append({
@@ -152,6 +150,7 @@ def SaveToCSV(data, output_file):
     df = df.dropna(how='all')  # Remove rows with all N/A values
     df = df.replace("N/A", "")  # Replace "N/A" with empty strings
     df.to_csv(output_file, mode='a', header=not pd.io.common.file_exists(output_file), index=False)
+
 
 
 
