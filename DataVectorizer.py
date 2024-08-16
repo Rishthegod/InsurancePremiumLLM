@@ -1,87 +1,62 @@
 import pandas as pd
-import re
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import LabelEncoder
+import tensorflow as tf
+from keras.preprocessing.text import Tokenizer
+from keras.utils import pad_sequences
+from sklearn.model_selection import train_test_split
 import numpy as np
+import re
 
-def preprocess_text(text):
-    """ 
-    Preprocess text by removing special characters and converting to lowercase.
-    
-    Parameters:
-        - text (str): The text to preprocess.
-    Returns:
-        - str: The preprocessed text.
-    """
-    text = re.sub(r'\W+', ' ', text)  # Remove special characters
-    text = text.lower()  # Convert to lowercase
-    return text
+# Load the CSV file
+data = pd.read_csv('business_types_data.csv')
 
-def load_and_preprocess_data(input_file):
-    """ 
-    Load and preprocess data from CSV.
-    
-    Parameters:
-        - input_file (str): The input CSV file.
-    Returns:
-        - tuple: A tuple containing the preprocessed descriptions and labels.
-    """
-    df = pd.read_csv(input_file)
-    
-    # Preprocess descriptions and footnotes
-    df['Phraseology'] = df['Phraseology'].apply(preprocess_text)
-    df['Footnote'] = df['Footnote'].apply(preprocess_text)
-    
-    # Combine Phraseology and Footnote for feature extraction
-    df['combined_text'] = df['Phraseology'] + ' ' + df['Footnote']
-    
-    # Extract features and labels
-    texts = df['combined_text'].values
-    labels = df['Classification Code'].values
-    
-    return texts, labels
+# Preprocess the 'Latest Pure Premium Rate' column
+data['Latest Pure Premium Rate'] = data['Latest Pure Premium Rate'].replace('[\$,]', '', regex=True).astype(float)
 
-def vectorize_text(texts):
-    """ 
-    Vectorize text using TF-IDF.
-    
-    Parameters:
-        - texts (list): The list of texts to vectorize.
-    Returns:
-        - np.ndarray: The TF-IDF vectorized text.
-    """
-    vectorizer = TfidfVectorizer(max_features=5000)
-    X = vectorizer.fit_transform(texts)
-    return X.toarray()
+# Preprocess the 'Classification Code' column
+data['Classification Code'] = data['Classification Code'].apply(lambda x: re.sub(r'\((\d+)\)', r'.\1', x))
+data['Classification Code'] = data['Classification Code'].astype(str)
 
-def encode_labels(labels):
-    """ 
-    Encode labels using LabelEncoder.
-    
-    Parameters:
-        - labels (list): The list of labels to encode.
-    Returns:
-        - np.ndarray: The encoded labels.
-    """
-    encoder = LabelEncoder()
-    y = encoder.fit_transform(labels)
-    return y
+# Combine 'Phraseology' and 'Footnote' for input text
+data['text'] = data['Phraseology'] + " " + data['Footnote']
 
-def save_data(X, y, output_features_file, output_labels_file):
-    """ 
-    Save data to files.
-    
-    Parameters:
-        - X (np.ndarray): The feature matrix.
-        - y (np.ndarray): The labels.
-        - output_features_file (str): The output file for features.
-        - output_labels_file (str): The output file for labels.
-    Returns:
-        - None
-    """
-    np.save(output_features_file, X)
-    np.save(output_labels_file, y)
+# Tokenization
+max_words = 10000
+max_len = 200
 
+tokenizer = Tokenizer(num_words=max_words, oov_token='<OOV>')
+tokenizer.fit_on_texts(data['text'])
+sequences = tokenizer.texts_to_sequences(data['text'])
+padded_sequences = pad_sequences(sequences, maxlen=max_len, padding='post', truncating='post')
 
-#if __name__ == '__main__':
- #   main()
+# Convert 'Classification Code' to numerical labels
+labels = data['Classification Code'].astype('category').cat.codes
+
+# Split the data into training and validation sets
+X_train, X_val, y_train, y_val = train_test_split(padded_sequences, labels, test_size=0.2, random_state=42)
+
+# Define data loader if necessary (for large datasets or batch processing)
+batch_size = 32
+
+train_data = tf.data.Dataset.from_tensor_slices((X_train, y_train)).batch(batch_size)
+val_data = tf.data.Dataset.from_tensor_slices((X_val, y_val)).batch(batch_size)
+
+# Save tokenizer for use in LLM training and inference
+import pickle
+with open('tokenizer.pkl', 'wb') as handle:
+    pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+# Additional preprocessing functions if necessary
+def preprocess_input(text):
+    """Preprocess the input text for prediction"""
+    sequence = tokenizer.texts_to_sequences([text])
+    padded_sequence = pad_sequences(sequence, maxlen=max_len, padding='post', truncating='post')
+    return padded_sequence
+
+# Ensure compatibility with M1 MacBook Air
+# If necessary, ensure that the environment is set up to use the CPU or M1 GPU correctly
+# For M1 MacBook Air, using TensorFlow's built-in support for Apple Silicon
+# Print out the shapes to verify
+print("Shape of X_train:", X_train.shape)
+print("Shape of X_test:", X_val.shape)
+print("Shape of y_train:", y_train.shape)
+print("Shape of y_test:", y_val.shape)
