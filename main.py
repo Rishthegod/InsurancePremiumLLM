@@ -1,4 +1,4 @@
-from ExpandedCSVScraper import *
+from webScraper.ExpandedCSVScraper import *
 from inference import *
 
 

@@ -1,0 +1,1 @@
+- Learning rate for BERT needs to be low (below 0.001) use 1e-5
